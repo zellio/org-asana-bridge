@@ -215,7 +215,7 @@ Fetch data from the Asana API and serialize into PATH"
       (sec min hour day mon year dow dst tz)
       (parse-time-string
        (replace-regexp-in-string "[TZ]" " " datestamp))
-    (list
+    (org-element-create
      'timestamp
      (list
       :type type
@@ -225,7 +225,8 @@ Fetch data from the Asana API and serialize into PATH"
       :hour-start hour
       :minute-start min
       :pre-blank 0
-      :post-blank 0))))
+      :post-blank 0))
+    ))
 
 (defun org-asana-bridge--task-asana-sexpr-to-org-sexpr (task)
   ""
@@ -248,8 +249,35 @@ Fetch data from the Asana API and serialize into PATH"
          (todo-keyword
           (if (eq :json-false (org-asana-bridge--assocdr 'completed task))
               "TODO" "DONE"))
-         (todo-type (intern (downcase todo-keyword))))
-    (list
+         (todo-type
+          (intern (downcase todo-keyword)))
+         (planning
+          (org-element-create
+           'planning
+           (list
+            :closed completed-date
+            :deadline due-date)))
+         (properties
+          (apply
+           'org-element-create
+           'property-drawer
+           '(:post-blank 1)
+           (mapcar
+            (lambda (key)
+              (org-element-create
+               'node-property
+               (list
+                :key (upcase (format "%s" key))
+                :value (org-asana-bridge--assocdr key task))))
+            ;; '(id created_at due_on due_at modified_at)
+            '(id modified_at))))
+         (body
+          (org-element-create
+           'paragraph
+           '(:pre-blank 0 :post-blank 0)
+           (let ((notes (org-asana-bridge--assocdr 'notes task)))
+             (if notes notes "")))))
+    (org-element-create
      'headline
      (list
       :closed completed-date
@@ -261,48 +289,45 @@ Fetch data from the Asana API and serialize into PATH"
       :title (org-asana-bridge--assocdr 'name task)
       :todo-keyword todo-keyword
       :todo-type todo-type)
-     `(section
-       nil
-       (planning
-        (:closed ,completed-date
-                 :deadline ,due-date))
-       (property-drawer
-        (:post-blank 1)
-        ,@(mapcar
-           (lambda (key)
-             `(node-property
-               (:key ,(upcase (format "%s" key))
-                :value ,(org-asana-bridge--assocdr key task))))
-           ;; '(id created_at due_on due_at modified_at)
-           '(id modified_at)))))
+     (org-element-create
+      'section
+      nil
+      planning
+      properties
+      body))
     ))
 
 (defun org-asana-bridge--asana-sexpr-to-org-sexpr (data)
   ""
-  `(headline
-    (:title
+  (org-element-create
+   'headline
+   '(:title
      "org-asana-bridge: generated task list"
      :level 1
      :pre-blank 0
      :post-blank 0)
-    (section
-     nil
-     ,(cl-loop
-       for workspace in data
-       for workspace-id = (car workspace)
-       for workspace-data = (cdr workspace)
-       collect
-       `(headline
-         (:title
-          ,(format "workspace: %d" workspace-id)
-          :level 2
-          :pre-blank 0
-          :post-blank 0)
-         ,(cl-loop
-           for task across workspace-data
-           collect (org-asana-bridge--task-asana-sexpr-to-org-sexpr task)))
-       ))
-    ))
+   (apply
+    'org-element-create
+    'section
+    nil
+    (cl-loop
+     for workspace in data
+     for workspace-id = (car workspace)
+     for workspace-data = (cdr workspace)
+     collect
+     (apply'
+      org-element-create
+      'headline
+      (list
+       :title (format "workspace: %d" workspace-id)
+       :level 2
+       :pre-blank 0
+       :post-blank 0)
+      (cl-loop
+       for task across workspace-data
+       collect (org-asana-bridge--task-asana-sexpr-to-org-sexpr task)))
+     ))
+   ))
 
 (defun org-asana-bridge--org-sexpr-to-asana-datestamp (date)
   ""
