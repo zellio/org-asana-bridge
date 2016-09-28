@@ -8,7 +8,7 @@
 ;; Created: 2016-06-14
 ;; Version: 0.3.0
 ;; Keywords: org-mode, elisp, project
-;; Package-Requires: ((cl-lib "0.4") (request "0.2.0"0))
+;; Package-Requires: ((cl-lib "0.4") (request "0.2.0"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -37,6 +37,7 @@
 
 (require 'cl-lib)
 (require 'request)
+(require 'org-element)
 
 (defconst org-asana-bridge-version "0.3.0"
   "`org-asana-bridge' version.")
@@ -146,7 +147,6 @@ to or reading from the data-cache you should be using this
 function to locate the file."
   (expand-file-name
    (format "%s.list" label) org-asana-bridge-cache-dir))
-
 
 (cl-defun org-asana-bridge--fetch-data
     (url-components path &key params)
