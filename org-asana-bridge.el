@@ -331,29 +331,48 @@ Fetch data from the Asana API and serialize into PATH"
 
 (defun org-asana-bridge--org-sexpr-to-asana-datestamp (date)
   ""
-  (format
-   "%04d-%02d-%02dT%02d:%02d:00.000Z"
-   (org-element-property :year-start date)
-   (org-element-property :month-start date)
-   (org-element-property :day-start date)
-   (org-element-property :hour-start date)
-   (org-element-property :minute-start date)
-   (org-element-property :minute-start date)))
+  (if (eq (car date) 'timestamp)
+      (format
+       "%04d-%02d-%02dT%02d:%02d:00.000Z"
+       (org-element-property :year-start date)
+       (org-element-property :month-start date)
+       (org-element-property :day-start date)
+       (org-element-property :hour-start date)
+       (org-element-property :minute-start date)
+       (org-element-property :minute-start date))
+    nil))
+
+(defun org-asana-bridge--task-org-sexpr-extract-notes (task)
+  ""
+  (string-join
+   (org-element-map task 'paragraph
+     (lambda (p)
+       (org-element-copy (car (org-element-contents p)))))
+   "\n"))
 
 (defun org-asana-bridge--task-org-sexpr-to-asana-sexpr (task)
   ""
-  )
+  `(;; (tags . [])
+    (due_at . ,(org-asana-bridge--org-sexpr-to-asana-datestamp
+                (org-element-property :deadline task)))
+    ;; (due_on)
+    (completed_at . ,(org-asana-bridge--org-sexpr-to-asana-datestamp
+                      (org-element-property :closed task)))
+    (completed . ,(if (eq (org-element-property :todo-type task) 'done)
+                      :json-true
+                    :json-false))
+    (notes . ,(org-asana-bridge--task-org-sexpr-extract-notes task))
+    (name . ,(org-element-property :raw-value task))
+    (modified_at . ,(org-element-property :MODIFIED_AT task))
+    ;; (created_at)
+    (id . ,(org-element-property :ID task))))
 
 (defun org-asana-bridge--org-sexpr-to-asana-sexpr (data)
   ""
-  )
-
-;; (save-current-buffer
-;;   (set-buffer (get-buffer-create "*org-asana-bridge-file-cache*"))
-;;   (erase-buffer)
-;;   (insert
-;;    (org-element-interpret-data
-;;     (org-asana-bridge--asana-sexpr-to-org-sexpr
-;;      (org-asana-bridge-load-asana-data)))))
+  (org-element-map data 'headline
+    (lambda (task)
+      (and (= (org-element-property :level task) 3)
+           (org-asana-bridge--task-org-sexpr-to-asana-sexpr task)))
+    ))
 
 ;;; org-asana-bridge.el ends here
